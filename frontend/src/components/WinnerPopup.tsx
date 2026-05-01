@@ -45,10 +45,14 @@ export function WinnerPopup({ round, onClose }: Props) {
   const maxPts = Math.max(winner?.points ?? 1, 1);
 
   useEffect(() => {
+    const sfx = new Audio("/sounds/fanfare.mp3");
+    sfx.volume = 0.7;
+    sfx.play().catch(() => {});
     playApplause();
     launchConfetti();
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      sfx.pause();
     };
   }, []);
 
