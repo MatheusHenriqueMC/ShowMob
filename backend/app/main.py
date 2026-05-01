@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     close_db_connection()
 
 
-app = FastAPI(lifespan=lifespan)
+app = FastAPI(lifespan=lifespan, redirect_slashes=False)
 
 origins = settings.allowed_origins_list
 app.add_middleware(
