@@ -1,6 +1,6 @@
 import time
 
-from app.core.database import get_db
+from app.core.database import get_db, get_rounds_data, get_totals_data
 from app.core.socket import sio
 
 
@@ -8,6 +8,12 @@ from app.core.socket import sio
 async def handle_join(sid: str, data: dict) -> None:
     code = (data.get("code") or "").upper()
     await sio.enter_room(sid, code)
+    db = get_db()
+    room = db.rooms.find_one({"code": code})
+    if room:
+        rounds = get_rounds_data(room["_id"])
+        totals = get_totals_data(room["_id"])
+        await sio.emit("state_update", {"rounds": rounds, "totals": totals}, to=sid)
 
 
 @sio.on("leave_room")

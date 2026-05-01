@@ -111,7 +111,8 @@ export default function RoomPage() {
 
   function setupSocket() {
     const sock = getSocket();
-    sock.emit("join_room", { code });
+    sock.on("connect", () => sock.emit("join_room", { code }));
+    if (sock.connected) sock.emit("join_room", { code });
 
     sock.on("state_update", ({ rounds: r, totals: t }: { rounds: Round[]; totals: Total[] }) => {
       setRounds(r);
