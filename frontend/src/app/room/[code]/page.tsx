@@ -56,6 +56,7 @@ export default function RoomPage() {
   const roundRef = useRef<Round | null>(null);
   const roomRef = useRef<Room | null>(null);
   const roundsRef = useRef<Round[]>([]);
+  const navigatePendingRef = useRef<number | null>(null);
 
   // keep refs in sync
   useEffect(() => { timerRef.current = timer; }, [timer]);
@@ -120,6 +121,10 @@ export default function RoomPage() {
       setRounds(r);
       setTotals(t);
       setCurrentRound((prev) => {
+        if (navigatePendingRef.current !== null) {
+          const target = r.find((x) => x.id === navigatePendingRef.current);
+          if (target) { navigatePendingRef.current = null; return target; }
+        }
         if (prev) return r.find((x) => x.id === prev.id) ?? r[0] ?? null;
         return r[0] ?? null;
       });
@@ -175,8 +180,14 @@ export default function RoomPage() {
     });
 
     sock.on("navigate_to_round", ({ round_id }: { round_id: number }) => {
+      setWinnerRound(null);
       const round = roundsRef.current.find((r) => r.id === round_id) ?? null;
       if (round) setCurrentRound(round);
+      else navigatePendingRef.current = round_id;
+    });
+
+    sock.on("keep_round", () => {
+      setWinnerRound(null);
     });
 
     sock.on("video_control", ({ round_id, action, position, server_ts }: { round_id: number; action: string; position: number; server_ts: number }) => {
@@ -552,8 +563,8 @@ export default function RoomPage() {
         <WinnerPopup
           round={winnerRound}
           onClose={() => setWinnerRound(null)}
-          onNewRound={!!isLeader() ? async () => { setWinnerRound(null); await newRound(true); } : undefined}
-          onKeepRound={!!isLeader() ? () => setWinnerRound(null) : undefined}
+          onNewRound={!!isLeader() ? async () => { await newRound(true); } : undefined}
+          onKeepRound={!!isLeader() ? () => getSocket().emit("keep_round", { code, user_id: user?.id }) : undefined}
         />
       )}
     </>

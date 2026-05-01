@@ -94,6 +94,20 @@ async def handle_navigate_to_round(sid: str, data: dict) -> None:
     await sio.emit("navigate_to_round", {"round_id": round_id}, room=code)
 
 
+@sio.on("keep_round")
+async def handle_keep_round(sid: str, data: dict) -> None:
+    code = (data.get("code") or "").upper()
+    try:
+        user_id = int(data.get("user_id", 0))
+    except (TypeError, ValueError):
+        return
+    db = get_db()
+    room = db.rooms.find_one({"code": code})
+    if not room or room["host_id"] != user_id:
+        return
+    await sio.emit("keep_round", {}, room=code)
+
+
 @sio.on("typing_indicator")
 async def handle_typing(sid: str, data: dict) -> None:
     code = (data.get("code") or "").upper()
