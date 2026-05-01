@@ -55,12 +55,15 @@ export default function RoomPage() {
   const answerSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const roundRef = useRef<Round | null>(null);
   const roomRef = useRef<Room | null>(null);
+  const roundsRef = useRef<Round[]>([]);
+  const navigatePendingRef = useRef<number | null>(null);
 
   // keep refs in sync
   useEffect(() => { timerRef.current = timer; }, [timer]);
   useEffect(() => { myAnswerRef.current = myAnswer; }, [myAnswer]);
   useEffect(() => { roundRef.current = currentRound; }, [currentRound]);
   useEffect(() => { roomRef.current = room; }, [room]);
+  useEffect(() => { roundsRef.current = rounds; }, [rounds]);
 
   const isLeader = useCallback(() => room && user && user.id === room.host_id, [room, user]);
 
@@ -72,7 +75,7 @@ export default function RoomPage() {
     loadRoom();
     return () => {
       const sock = getSocket();
-      sock.emit("leave_room", { code });
+      sock.emit("leave_room", { code, user_id: user?.id });
       disconnectSocket();
     };
   }, [loading, token]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -83,7 +86,7 @@ export default function RoomPage() {
     const [roundsData, totalsData, timerData] = await Promise.all([
       api<Round[]>(`/rooms/${code}/rounds`),
       api<Total[]>(`/rooms/${code}/totals`),
-      api<{ active: boolean; session_id?: string; duration?: number; started_at_ms?: number; round_id?: number }>(`/rooms/${code}/timer`),
+      api<{ active: boolean; session_id?: string; duration?: number; remaining_ms?: number; round_id?: number }>(`/rooms/${code}/timer`),
     ]);
     setRoom(roomData);
     setRounds(roundsData);
@@ -93,9 +96,9 @@ export default function RoomPage() {
     const vs: Record<number, VideoStateEntry> = {};
     roundsData.forEach((r) => { if (r.video_state) vs[r.id] = r.video_state; });
     setVideoState(vs);
-    if (timerData.active && timerData.session_id && timerData.duration && timerData.started_at_ms) {
-      const end_at_ms = timerData.started_at_ms + timerData.duration * 1000;
-      if (end_at_ms > Date.now()) {
+    if (timerData.active && timerData.session_id && timerData.duration && timerData.remaining_ms! > 0) {
+      const end_at_ms = Date.now() + timerData.remaining_ms!;
+      {
         const ts: TimerState = { session_id: timerData.session_id, duration: timerData.duration, round_id: timerData.round_id!, end_at_ms };
         setTimer(ts);
         timerRef.current = ts;
@@ -118,6 +121,10 @@ export default function RoomPage() {
       setRounds(r);
       setTotals(t);
       setCurrentRound((prev) => {
+        if (navigatePendingRef.current !== null) {
+          const target = r.find((x) => x.id === navigatePendingRef.current);
+          if (target) { navigatePendingRef.current = null; return target; }
+        }
         if (prev) return r.find((x) => x.id === prev.id) ?? r[0] ?? null;
         return r[0] ?? null;
       });
@@ -132,7 +139,7 @@ export default function RoomPage() {
       myAnswerRef.current = "";
       setTypingUsers({});
       setRoundAnswers((prev) => { const n = { ...prev }; delete n[round_id]; return n; });
-      const end_at_ms = started_at_ms + duration * 1000;
+      const end_at_ms = Date.now() + duration * 1000;
       const ts: TimerState = { session_id, duration, round_id, end_at_ms };
       setTimer(ts);
       timerRef.current = ts;
@@ -161,6 +168,30 @@ export default function RoomPage() {
       setRounds((prev) => prev.map((r) => r.id === round_id ? { ...r, video_id: video_id || null } : r));
       setCurrentRound((prev) => prev?.id === round_id ? { ...prev, video_id: video_id || null } : prev);
       if (!video_id) setVideoState((prev) => { const n = { ...prev }; delete n[round_id]; return n; });
+    });
+
+    sock.on("score_change", ({ round_id, uid, delta }: { round_id: number; uid: string; delta: number }) => {
+      adjustScore(round_id, uid, delta);
+    });
+
+    sock.on("room_closed", () => {
+      router.replace("/lobby");
+    });
+
+    sock.on("round_finished", ({ round_id }: { round_id: number }) => {
+      const round = roundsRef.current.find((r) => r.id === round_id) ?? null;
+      if (round) setWinnerRound(round);
+    });
+
+    sock.on("navigate_to_round", ({ round_id }: { round_id: number }) => {
+      setWinnerRound(null);
+      const round = roundsRef.current.find((r) => r.id === round_id) ?? null;
+      if (round) setCurrentRound(round);
+      else navigatePendingRef.current = round_id;
+    });
+
+    sock.on("keep_round", () => {
+      setWinnerRound(null);
     });
 
     sock.on("video_control", ({ round_id, action, position, server_ts }: { round_id: number; action: string; position: number; server_ts: number }) => {
@@ -201,16 +232,31 @@ export default function RoomPage() {
     await api(`/rooms/${r.code}/timer/answer`, "POST", { session_id: t.session_id, text: myAnswerRef.current });
   }
 
-  async function newRound() {
-    const res = await api<{ error?: string }>(`/rooms/${code}/rounds`, "POST");
-    if (res.error) alert(res.error);
+  async function newRound(navigateAll = false) {
+    const res = await api<{ id?: number; error?: string }>(`/rooms/${code}/rounds`, "POST");
+    if (res.error) { alert(res.error); return; }
+    if (navigateAll && res.id && user) {
+      getSocket().emit("navigate_to_round", { code, round_id: res.id, user_id: user.id });
+    }
+  }
+
+  function adjustScore(rid: number, uid: string, delta: number) {
+    const update = (r: Round): Round => r.id !== rid ? r : {
+      ...r, scores: { ...r.scores, [uid]: { ...r.scores[uid], points: Math.max(0, (r.scores[uid]?.points ?? 0) + delta) } }
+    };
+    setRounds((prev) => prev.map(update));
+    setCurrentRound((prev) => prev ? update(prev) : prev);
   }
 
   async function increment(rid: number, uid: string) {
+    adjustScore(rid, uid, 1);
+    getSocket().emit("score_change", { code, round_id: rid, uid, delta: 1, user_id: user?.id });
     await api(`/rooms/${code}/scores/${rid}/${uid}/increment`, "POST");
   }
 
   async function decrement(rid: number, uid: string) {
+    adjustScore(rid, uid, -1);
+    getSocket().emit("score_change", { code, round_id: rid, uid, delta: -1, user_id: user?.id });
     await api(`/rooms/${code}/scores/${rid}/${uid}/decrement`, "POST");
   }
 
@@ -232,7 +278,9 @@ export default function RoomPage() {
   }
 
   async function startTimer(roundId: number) {
-    const res = await api<{ error?: string }>(`/rooms/${code}/timer/start`, "POST", { round_id: roundId, duration: timerDuration });
+    const duration = Math.max(5, Math.min(60, timerDuration || 30));
+    setTimerDuration(duration);
+    const res = await api<{ error?: string }>(`/rooms/${code}/timer/start`, "POST", { round_id: roundId, duration });
     if (res.error) alert(res.error);
   }
 
@@ -251,7 +299,7 @@ export default function RoomPage() {
 
   async function leaveRoom() {
     if (!confirm("Sair da sala?")) return;
-    getSocket().emit("leave_room", { code });
+    getSocket().emit("leave_room", { code, user_id: user?.id });
     localStorage.removeItem("ms_room");
     disconnectSocket();
     router.push("/lobby");
@@ -308,7 +356,7 @@ export default function RoomPage() {
       <>
         <div className="current-round-header">
           <div>{roundSelector}</div>
-          <button className="btn-new-round" onClick={newRound}>+ NOVA RODADA</button>
+          <button className="btn-new-round" onClick={() => newRound()}>+ NOVA RODADA</button>
         </div>
         <div className="no-round">
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎮</div>
@@ -328,7 +376,6 @@ export default function RoomPage() {
       <>
         <div className="current-round-header">
           <div>{roundSelector}</div>
-          <button className="btn-new-round" onClick={newRound}>+ NOVA RODADA</button>
         </div>
 
         <div className="round-title-row">
@@ -365,7 +412,8 @@ export default function RoomPage() {
               min={5}
               max={60}
               value={timerDuration}
-              onChange={(e) => setTimerDuration(Math.max(5, Math.min(60, +e.target.value || 30)))}
+              onChange={(e) => setTimerDuration(+e.target.value || 0)}
+              onBlur={(e) => setTimerDuration(Math.max(5, Math.min(60, +e.target.value || 30)))}
             />
             <span style={{ color: "var(--text2)", fontSize: 12 }}>seg</span>
             <span style={{ flex: 1 }} />
@@ -412,7 +460,11 @@ export default function RoomPage() {
           })}
         </div>
 
-        <button className="btn-finalizar" onClick={() => setWinnerRound(cr)}>🏆 FINALIZAR RODADA</button>
+        {leader && (
+          <button className="btn-finalizar" onClick={() => getSocket().emit("finish_round", { code, round_id: cr.id, user_id: user?.id })}>
+            🏆 FINALIZAR RODADA
+          </button>
+        )}
 
         <div className="totals-section">
           <div className="totals-title">PONTUAÇÃO DA RODADA {cr.number}</div>
@@ -526,7 +578,14 @@ export default function RoomPage() {
         />
       )}
       {showAdmin && <AdminModal onClose={() => setShowAdmin(false)} />}
-      {winnerRound && <WinnerPopup round={winnerRound} onClose={() => setWinnerRound(null)} />}
+      {winnerRound && (
+        <WinnerPopup
+          round={winnerRound}
+          onClose={() => setWinnerRound(null)}
+          onNewRound={!!isLeader() ? async () => { await newRound(true); } : undefined}
+          onKeepRound={!!isLeader() ? () => getSocket().emit("keep_round", { code, user_id: user?.id }) : undefined}
+        />
+      )}
     </>
   );
 }

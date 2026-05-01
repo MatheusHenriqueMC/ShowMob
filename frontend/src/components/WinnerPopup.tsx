@@ -6,6 +6,8 @@ import type { Round } from "@/lib/types";
 interface Props {
   round: Round;
   onClose: () => void;
+  onNewRound?: () => Promise<void>;
+  onKeepRound?: () => void;
 }
 
 function playApplause() {
@@ -33,7 +35,7 @@ function playApplause() {
   } catch { /* ignore */ }
 }
 
-export function WinnerPopup({ round, onClose }: Props) {
+export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
 
@@ -135,7 +137,14 @@ export function WinnerPopup({ round, onClose }: Props) {
             ))}
           </div>
 
-          <button className="btn-close-popup" onClick={onClose}>FECHAR</button>
+          {onNewRound && onKeepRound ? (
+            <div style={{ display: "flex", gap: 12, width: "100%" }}>
+              <button className="btn-close-popup" style={{ flex: 1 }} onClick={onNewRound}>🔄 NOVA RODADA</button>
+              <button className="btn btn-ghost" style={{ flex: 1, padding: "14px 0", fontSize: 13 }} onClick={onKeepRound}>✓ MANTER RODADA</button>
+            </div>
+          ) : (
+            <button className="btn-close-popup" onClick={onClose}>FECHAR</button>
+          )}
         </div>
       </div>
     </>
