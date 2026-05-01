@@ -10,30 +10,6 @@ interface Props {
   onKeepRound?: () => void;
 }
 
-function playApplause() {
-  try {
-    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
-    const now = ctx.currentTime;
-    const clap = (time: number, freq: number, gain: number) => {
-      const len = Math.floor(ctx.sampleRate * 0.11);
-      const buf = ctx.createBuffer(1, len, ctx.sampleRate);
-      const d = buf.getChannelData(0);
-      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.2);
-      const src = ctx.createBufferSource(); src.buffer = buf;
-      const f = ctx.createBiquadFilter(); f.type = "bandpass"; f.frequency.value = freq; f.Q.value = 1.2;
-      const f2 = ctx.createBiquadFilter(); f2.type = "highpass"; f2.frequency.value = 600;
-      const g = ctx.createGain(); g.gain.setValueAtTime(gain, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
-      src.connect(f); f.connect(f2); f2.connect(g); g.connect(ctx.destination);
-      src.start(time); src.stop(time + 0.22);
-    };
-    [0, 0.08, 0.16, 0.26, 0.36, 0.48, 0.62, 0.78, 0.96, 1.16, 1.38, 1.62].forEach((t) => {
-      clap(now + t, 1000 + Math.random() * 400, 0.5 + Math.random() * 0.4);
-      clap(now + t + Math.random() * 0.03, 1300 + Math.random() * 300, 0.3 + Math.random() * 0.3);
-      clap(now + t + Math.random() * 0.05, 800 + Math.random() * 300, 0.2 + Math.random() * 0.25);
-    });
-    setTimeout(() => ctx.close(), 2500);
-  } catch { /* ignore */ }
-}
 
 export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,7 +26,6 @@ export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) 
     const sfx = new Audio("/sounds/fanfare.mp3");
     sfx.volume = 0.7;
     sfx.play().catch(() => {});
-    playApplause();
     launchConfetti();
     return () => {
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
