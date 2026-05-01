@@ -80,32 +80,33 @@ def get_room_members(room_id: int) -> list[dict]:
 def get_rounds_data(room_id: int) -> list[dict]:
     db = get_db()
     rounds = list(db.rounds.find({"room_id": room_id}).sort("number", -1))
-    result = []
-    for r in rounds:
-        scores = list(db.scores.find({"round_id": r["_id"]}))
-        users = {
-            u["_id"]: u
-            for u in db.users.find({"_id": {"$in": [s["user_id"] for s in scores]}})
+    if not rounds:
+        return []
+    round_ids = [r["_id"] for r in rounds]
+    all_scores = list(db.scores.find({"round_id": {"$in": round_ids}}))
+    user_ids = list({s["user_id"] for s in all_scores})
+    users = {u["_id"]: u for u in db.users.find({"_id": {"$in": user_ids}})}
+    scores_by_round: dict = {}
+    for s in all_scores:
+        u = users.get(s["user_id"], {})
+        scores_by_round.setdefault(s["round_id"], {})[str(s["user_id"])] = {
+            "points": s["points"],
+            "name": u.get("display_name") or u.get("username", ""),
+            "avatar": u.get("avatar"),
+            "color": u.get("color"),
         }
-        result.append({
+    return [
+        {
             "id": r["_id"],
             "number": r["number"],
             "title": r.get("title"),
             "created_at": r["created_at"],
             "video_id": r.get("video_id") or None,
             "video_state": r.get("video_state") or None,
-            "scores": {
-                str(s["user_id"]): {
-                    "points": s["points"],
-                    "name": users.get(s["user_id"], {}).get("display_name")
-                        or users.get(s["user_id"], {}).get("username", ""),
-                    "avatar": users.get(s["user_id"], {}).get("avatar"),
-                    "color": users.get(s["user_id"], {}).get("color"),
-                }
-                for s in scores
-            },
-        })
-    return result
+            "scores": scores_by_round.get(r["_id"], {}),
+        }
+        for r in rounds
+    ]
 
 
 def get_totals_data(room_id: int) -> list[dict]:

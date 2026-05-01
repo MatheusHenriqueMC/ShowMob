@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.database import get_db, get_next_id, gen_code, now, get_room_members
 from app.core.dependencies import get_auth_user
+from app.core.helpers import push_state
 from app.core.socket import emit_sync
 from app.schemas.rooms import CreateRoomRequest, JoinRoomRequest
 
@@ -46,8 +47,15 @@ def join_room(body: JoinRoomRequest, user=Depends(get_auth_user)):
         {"$setOnInsert": {"room_id": room_id, "user_id": user["id"]}},
         upsert=True,
     )
+    for r in db.rounds.find({"room_id": room_id}, {"_id": 1}):
+        db.scores.update_one(
+            {"round_id": r["_id"], "user_id": user["id"]},
+            {"$setOnInsert": {"round_id": r["_id"], "user_id": user["id"], "points": 0}},
+            upsert=True,
+        )
     members = get_room_members(room_id)
     emit_sync("members_updated", {"members": members}, room=code)
+    push_state(code, room_id)
     return {"id": room_id, "code": room["code"], "name": room["name"], "host_id": room["host_id"]}
 
 
