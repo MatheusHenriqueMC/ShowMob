@@ -61,6 +61,7 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
   const currentVideoIdRef = useRef<string | null>(null);
   const suppressRef = useRef(false);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playEmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
 
   const clearSync = useCallback(() => {
@@ -79,9 +80,22 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
 
   const onStateChange = useCallback((event: { data: number }) => {
     if (!isLeader || suppressRef.current) return;
-    const pos = playerRef.current?.getCurrentTime() ?? 0;
-    if (event.data === 1) { onVideoControl("play", pos); startSync(); }
-    else if (event.data === 2 || event.data === 0) { onVideoControl("pause", pos); clearSync(); }
+    if (event.data === 1) {
+      startSync();
+      // Delay reading getCurrentTime() — on pause→play transitions (especially after
+      // long pauses during timer), YouTube's player returns 0 during the buffering
+      // instant before the internal clock resumes from the correct position.
+      if (playEmitTimeoutRef.current) clearTimeout(playEmitTimeoutRef.current);
+      playEmitTimeoutRef.current = setTimeout(() => {
+        playEmitTimeoutRef.current = null;
+        if (playerRef.current) onVideoControl("play", playerRef.current.getCurrentTime());
+      }, 150);
+    } else if (event.data === 2 || event.data === 0) {
+      if (playEmitTimeoutRef.current) { clearTimeout(playEmitTimeoutRef.current); playEmitTimeoutRef.current = null; }
+      const pos = playerRef.current?.getCurrentTime() ?? 0;
+      onVideoControl("pause", pos);
+      clearSync();
+    }
   }, [isLeader, onVideoControl, startSync, clearSync]);
 
   const mountPlayer = useCallback((vid: string) => {

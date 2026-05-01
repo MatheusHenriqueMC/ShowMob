@@ -85,7 +85,6 @@ export function ProfileModal({ user, onClose, onSaved }: Props) {
               <div
                 className="avatar-big"
                 style={{ borderColor: editColor, background: currentAvatar ? undefined : editColor + "22", color: editColor }}
-                onClick={() => fileRef.current?.click()}
               >
                 {currentAvatar ? (
                   <img src={currentAvatar} alt="avatar" />
