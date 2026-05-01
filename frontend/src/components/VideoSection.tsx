@@ -75,7 +75,7 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
       if (isLeader && playerRef.current) {
         onVideoControl("sync", playerRef.current.getCurrentTime());
       }
-    }, 4000);
+    }, 2000);
   }, [clearSync, isLeader, onVideoControl]);
 
   const onStateChange = useCallback((event: { data: number }) => {
@@ -146,10 +146,32 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
   const applyRemoteControl = useCallback((action: string, position: number, serverTs: number) => {
     if (isLeader || !playerRef.current) return;
     const drift = (Date.now() - serverTs) / 1000;
-    const adj = Math.max(0, position + (action !== "pause" ? drift : 0));
+
+    if (action === "pause") {
+      suppressRef.current = true;
+      playerRef.current.seekTo(position, true);
+      playerRef.current.pauseVideo();
+      setTimeout(() => { suppressRef.current = false; }, 600);
+      return;
+    }
+
+    if (action === "sync") {
+      // Only correct if the follower has drifted more than 1.5s to avoid jarring micro-seeks
+      const current = playerRef.current.getCurrentTime();
+      const adj = Math.max(0, position + drift);
+      if (Math.abs(current - adj) < 1.5) return;
+      suppressRef.current = true;
+      playerRef.current.seekTo(adj, true);
+      playerRef.current.playVideo();
+      setTimeout(() => { suppressRef.current = false; }, 600);
+      return;
+    }
+
+    // play event: add 0.5s to compensate for YouTube's seek+buffer startup latency
+    const adj = Math.max(0, position + drift + 0.5);
     suppressRef.current = true;
     playerRef.current.seekTo(adj, true);
-    if (action !== "pause") playerRef.current.playVideo(); else playerRef.current.pauseVideo();
+    playerRef.current.playVideo();
     setTimeout(() => { suppressRef.current = false; }, 600);
   }, [isLeader]);
 
