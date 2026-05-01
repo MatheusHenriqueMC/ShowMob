@@ -63,6 +63,10 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const playEmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
+  const videoStateRef = useRef<typeof videoState>(videoState);
+  const onStateChangeRef = useRef<(e: { data: number }) => void>(() => {});
+
+  useEffect(() => { videoStateRef.current = videoState; }, [videoState]);
 
   const clearSync = useCallback(() => {
     if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
@@ -98,6 +102,8 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
     }
   }, [isLeader, onVideoControl, startSync, clearSync]);
 
+  useEffect(() => { onStateChangeRef.current = onStateChange; }, [onStateChange]);
+
   const mountPlayer = useCallback((vid: string) => {
     if (!containerRef.current || !window.YT?.Player) return;
     if (vid === currentVideoIdRef.current && containerRef.current.childElementCount > 0) return;
@@ -107,11 +113,13 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
     const div = document.createElement("div");
     div.id = `ytEl-${roundId}`;
     containerRef.current.appendChild(div);
+    // Read videoState from ref so mountPlayer isn't recreated on every sync event
+    const vs = videoStateRef.current;
     let startSec = 0;
-    if (videoState) {
-      startSec = videoState.playing
-        ? videoState.position + (Date.now() - videoState.position_at_ms) / 1000
-        : videoState.position;
+    if (vs) {
+      startSec = vs.playing
+        ? vs.position + (Date.now() - vs.position_at_ms) / 1000
+        : vs.position;
       startSec = Math.max(0, Math.floor(startSec));
     }
     playerRef.current = new window.YT.Player(div, {
@@ -120,11 +128,13 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
       videoId: vid,
       playerVars: { controls: isLeader ? 1 : 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: isLeader ? 0 : 1, fs: 1, iv_load_policy: 3, start: startSec },
       events: {
-        onReady: (e) => { if (videoState?.playing) e.target.playVideo(); },
-        onStateChange,
+        onReady: (e) => { if (vs?.playing) e.target.playVideo(); },
+        // Wrap via ref so the player always calls the latest onStateChange without
+        // needing to recreate the player when onStateChange's deps change.
+        onStateChange: (e) => onStateChangeRef.current(e),
       },
     });
-  }, [roundId, videoState, isLeader, onStateChange]);
+  }, [roundId, isLeader]);
 
   useEffect(() => {
     loadYTScript();
