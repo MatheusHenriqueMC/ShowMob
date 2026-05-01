@@ -236,11 +236,21 @@ export default function RoomPage() {
     }
   }
 
+  function adjustScore(rid: number, uid: string, delta: number) {
+    const update = (r: Round): Round => r.id !== rid ? r : {
+      ...r, scores: { ...r.scores, [uid]: { ...r.scores[uid], points: Math.max(0, (r.scores[uid]?.points ?? 0) + delta) } }
+    };
+    setRounds((prev) => prev.map(update));
+    setCurrentRound((prev) => prev ? update(prev) : prev);
+  }
+
   async function increment(rid: number, uid: string) {
+    adjustScore(rid, uid, 1);
     await api(`/rooms/${code}/scores/${rid}/${uid}/increment`, "POST");
   }
 
   async function decrement(rid: number, uid: string) {
+    adjustScore(rid, uid, -1);
     await api(`/rooms/${code}/scores/${rid}/${uid}/decrement`, "POST");
   }
 
