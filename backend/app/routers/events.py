@@ -64,6 +64,24 @@ async def handle_video_control(sid: str, data: dict) -> None:
     )
 
 
+@sio.on("score_change")
+async def handle_score_change(sid: str, data: dict) -> None:
+    code = (data.get("code") or "").upper()
+    try:
+        user_id = int(data.get("user_id", 0))
+        round_id = int(data.get("round_id", 0))
+        delta = int(data.get("delta", 0))
+    except (TypeError, ValueError):
+        return
+    if delta not in (1, -1):
+        return
+    db = get_db()
+    room = db.rooms.find_one({"code": code})
+    if not room or room["host_id"] != user_id:
+        return
+    await sio.emit("score_change", {"round_id": round_id, "uid": data.get("uid"), "delta": delta}, room=code, skip_sid=sid)
+
+
 @sio.on("finish_round")
 async def handle_finish_round(sid: str, data: dict) -> None:
     code = (data.get("code") or "").upper()

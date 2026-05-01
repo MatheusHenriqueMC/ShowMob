@@ -170,6 +170,10 @@ export default function RoomPage() {
       if (!video_id) setVideoState((prev) => { const n = { ...prev }; delete n[round_id]; return n; });
     });
 
+    sock.on("score_change", ({ round_id, uid, delta }: { round_id: number; uid: string; delta: number }) => {
+      adjustScore(round_id, uid, delta);
+    });
+
     sock.on("room_closed", () => {
       router.replace("/lobby");
     });
@@ -246,11 +250,13 @@ export default function RoomPage() {
 
   async function increment(rid: number, uid: string) {
     adjustScore(rid, uid, 1);
+    getSocket().emit("score_change", { code, round_id: rid, uid, delta: 1, user_id: user?.id });
     await api(`/rooms/${code}/scores/${rid}/${uid}/increment`, "POST");
   }
 
   async function decrement(rid: number, uid: string) {
     adjustScore(rid, uid, -1);
+    getSocket().emit("score_change", { code, round_id: rid, uid, delta: -1, user_id: user?.id });
     await api(`/rooms/${code}/scores/${rid}/${uid}/decrement`, "POST");
   }
 
