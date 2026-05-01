@@ -170,6 +170,7 @@ export default function RoomPage() {
     });
 
     sock.on("round_finished", ({ round_id }: { round_id: number }) => {
+      console.log("[FR] received round_finished", round_id, "rounds:", roundsRef.current.map(r => r.id));
       const round = roundsRef.current.find((r) => r.id === round_id) ?? null;
       if (round) setWinnerRound(round);
     });
@@ -431,7 +432,11 @@ export default function RoomPage() {
         </div>
 
         {leader && (
-          <button className="btn-finalizar" onClick={() => getSocket().emit("finish_round", { code, round_id: cr.id, user_id: user?.id })}>
+          <button className="btn-finalizar" onClick={() => {
+            const payload = { code, round_id: cr.id, user_id: user?.id };
+            console.log("[FR] emitting finish_round", payload, "socket connected:", getSocket().connected);
+            getSocket().emit("finish_round", payload, (ack: unknown) => console.log("[FR] ack:", ack));
+          }}>
             🏆 FINALIZAR RODADA
           </button>
         )}
