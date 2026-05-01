@@ -14,9 +14,9 @@ services:
     restart: unless-stopped
     depends_on:
       - mongodb
-    environment:
-      - MONGO_URI=mongodb://mongodb:27017
-      - MONGO_DB=mobshow
+    env_file: ./backend/.env
+    ports:
+      - "8000:8000"
     networks:
       - mobshow
 
@@ -24,10 +24,11 @@ services:
     build: ./frontend
     container_name: mobshow-web
     restart: unless-stopped
-    ports:
-      - "3000:80"
     depends_on:
       - backend
+    env_file: ./frontend/.env
+    ports:
+      - "3000:3000"
     networks:
       - mobshow
 
