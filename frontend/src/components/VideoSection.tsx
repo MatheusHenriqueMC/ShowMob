@@ -141,8 +141,8 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
 
   // Expose applyRemoteControl via ref on window (VideoSection is used by GamePage)
   useEffect(() => {
-    (window as Record<string, unknown>)[`applyVideoControl_${roundId}`] = applyRemoteControl;
-    return () => { delete (window as Record<string, unknown>)[`applyVideoControl_${roundId}`]; };
+    (window as unknown as Record<string, unknown>)[`applyVideoControl_${roundId}`] = applyRemoteControl;
+    return () => { delete (window as unknown as Record<string, unknown>)[`applyVideoControl_${roundId}`]; };
   }, [roundId, applyRemoteControl]);
 
   if (!videoId && !isLeader) return null;

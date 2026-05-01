@@ -164,7 +164,7 @@ export default function RoomPage() {
 
     sock.on("video_control", ({ round_id, action, position, server_ts }: { round_id: number; action: string; position: number; server_ts: number }) => {
       setVideoState((prev) => ({ ...prev, [round_id]: { playing: action !== "pause", position, position_at_ms: server_ts } }));
-      const fn = (window as Record<string, unknown>)[`applyVideoControl_${round_id}`];
+      const fn = (window as unknown as Record<string, unknown>)[`applyVideoControl_${round_id}`];
       if (typeof fn === "function") (fn as (a: string, p: number, t: number) => void)(action, position, server_ts);
     });
 
