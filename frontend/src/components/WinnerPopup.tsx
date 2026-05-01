@@ -12,7 +12,7 @@ function playApplause() {
   try {
     const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
     const now = ctx.currentTime;
-    function clap(time: number, freq: number, gain: number) {
+    const clap = (time: number, freq: number, gain: number) => {
       const len = Math.floor(ctx.sampleRate * 0.11);
       const buf = ctx.createBuffer(1, len, ctx.sampleRate);
       const d = buf.getChannelData(0);
@@ -23,7 +23,7 @@ function playApplause() {
       const g = ctx.createGain(); g.gain.setValueAtTime(gain, time); g.gain.exponentialRampToValueAtTime(0.001, time + 0.18);
       src.connect(f); f.connect(f2); f2.connect(g); g.connect(ctx.destination);
       src.start(time); src.stop(time + 0.22);
-    }
+    };
     [0, 0.08, 0.16, 0.26, 0.36, 0.48, 0.62, 0.78, 0.96, 1.16, 1.38, 1.62].forEach((t) => {
       clap(now + t, 1000 + Math.random() * 400, 0.5 + Math.random() * 0.4);
       clap(now + t + Math.random() * 0.03, 1300 + Math.random() * 300, 0.3 + Math.random() * 0.3);
