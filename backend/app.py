@@ -504,11 +504,12 @@ def get_timer(code):
     if session['started_at_ms'] + session['duration'] * 1000 < int(time.time() * 1000):
         _end_timer(session['_id'], code.upper())
         return jsonify({"active": False})
+    remaining_ms = max(0, int(session['started_at_ms'] + session['duration'] * 1000 - time.time() * 1000))
     return jsonify({
         "active": True,
         "session_id": session['_id'],
         "duration": session['duration'],
-        "started_at_ms": session['started_at_ms'],
+        "remaining_ms": remaining_ms,
         "round_id": session['round_id']
     })
 
@@ -583,7 +584,12 @@ def handle_join(data):
 @socketio.on('leave_room')
 def handle_leave(data):
     code = (data.get('code') or '').upper()
+    user_id = data.get('user_id')
     sio_leave(code)
+    if user_id:
+        room = db.rooms.find_one({'code': code})
+        if room and room['host_id'] == user_id:
+            socketio.emit('room_closed', {}, room=code)
 
 
 @socketio.on('video_set')
@@ -615,6 +621,26 @@ def handle_video_control(data):
     socketio.emit('video_control', {
         'round_id': round_id, 'action': action, 'position': position, 'server_ts': server_ts
     }, room=code)
+
+
+@socketio.on('finish_round')
+def handle_finish_round(data):
+    code = (data.get('code') or '').upper()
+    user_id = data.get('user_id')
+    room = db.rooms.find_one({'code': code})
+    if not room or room['host_id'] != user_id:
+        return
+    socketio.emit('round_finished', {'round_id': data.get('round_id')}, room=code)
+
+
+@socketio.on('navigate_to_round')
+def handle_navigate_to_round(data):
+    code = (data.get('code') or '').upper()
+    user_id = data.get('user_id')
+    room = db.rooms.find_one({'code': code})
+    if not room or room['host_id'] != user_id:
+        return
+    socketio.emit('navigate_to_round', {'round_id': data.get('round_id')}, room=code)
 
 
 @socketio.on('typing_indicator')
