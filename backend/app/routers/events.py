@@ -19,7 +19,13 @@ async def handle_join(sid: str, data: dict) -> None:
 @sio.on("leave_room")
 async def handle_leave(sid: str, data: dict) -> None:
     code = (data.get("code") or "").upper()
+    user_id = data.get("user_id")
     await sio.leave_room(sid, code)
+    if user_id:
+        db = get_db()
+        room = db.rooms.find_one({"code": code})
+        if room and room["host_id"] == int(user_id):
+            await sio.emit("room_closed", {}, room=code)
 
 
 @sio.on("video_set")
@@ -56,6 +62,36 @@ async def handle_video_control(sid: str, data: dict) -> None:
         {"round_id": round_id, "action": action, "position": position, "server_ts": server_ts},
         room=code,
     )
+
+
+@sio.on("finish_round")
+async def handle_finish_round(sid: str, data: dict) -> None:
+    code = (data.get("code") or "").upper()
+    try:
+        user_id = int(data.get("user_id", 0))
+        round_id = int(data.get("round_id", 0))
+    except (TypeError, ValueError):
+        return
+    db = get_db()
+    room = db.rooms.find_one({"code": code})
+    if not room or room["host_id"] != user_id:
+        return
+    await sio.emit("round_finished", {"round_id": round_id}, room=code)
+
+
+@sio.on("navigate_to_round")
+async def handle_navigate_to_round(sid: str, data: dict) -> None:
+    code = (data.get("code") or "").upper()
+    try:
+        user_id = int(data.get("user_id", 0))
+        round_id = int(data.get("round_id", 0))
+    except (TypeError, ValueError):
+        return
+    db = get_db()
+    room = db.rooms.find_one({"code": code})
+    if not room or room["host_id"] != user_id:
+        return
+    await sio.emit("navigate_to_round", {"round_id": round_id}, room=code)
 
 
 @sio.on("typing_indicator")

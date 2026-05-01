@@ -44,11 +44,12 @@ async def get_timer(code: str, user=Depends(get_auth_user)):
     if session["started_at_ms"] + session["duration"] * 1000 < int(time.time() * 1000):
         await _end_timer(session["_id"], code.upper())
         return {"active": False}
+    remaining_ms = max(0, int(session["started_at_ms"] + session["duration"] * 1000 - time.time() * 1000))
     return {
         "active": True,
         "session_id": session["_id"],
         "duration": session["duration"],
-        "started_at_ms": session["started_at_ms"],
+        "remaining_ms": remaining_ms,
         "round_id": session["round_id"],
     }
 
