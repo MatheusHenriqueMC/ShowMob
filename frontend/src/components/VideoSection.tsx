@@ -61,7 +61,12 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
   const currentVideoIdRef = useRef<string | null>(null);
   const suppressRef = useRef(false);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const playEmitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const urlInputRef = useRef<HTMLInputElement>(null);
+  const videoStateRef = useRef<typeof videoState>(videoState);
+  const onStateChangeRef = useRef<(e: { data: number }) => void>(() => {});
+
+  useEffect(() => { videoStateRef.current = videoState; }, [videoState]);
 
   const clearSync = useCallback(() => {
     if (syncIntervalRef.current) clearInterval(syncIntervalRef.current);
@@ -74,15 +79,30 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
       if (isLeader && playerRef.current) {
         onVideoControl("sync", playerRef.current.getCurrentTime());
       }
-    }, 4000);
+    }, 2000);
   }, [clearSync, isLeader, onVideoControl]);
 
   const onStateChange = useCallback((event: { data: number }) => {
     if (!isLeader || suppressRef.current) return;
-    const pos = playerRef.current?.getCurrentTime() ?? 0;
-    if (event.data === 1) { onVideoControl("play", pos); startSync(); }
-    else if (event.data === 2 || event.data === 0) { onVideoControl("pause", pos); clearSync(); }
+    if (event.data === 1) {
+      startSync();
+      // Delay reading getCurrentTime() — on pause→play transitions (especially after
+      // long pauses during timer), YouTube's player returns 0 during the buffering
+      // instant before the internal clock resumes from the correct position.
+      if (playEmitTimeoutRef.current) clearTimeout(playEmitTimeoutRef.current);
+      playEmitTimeoutRef.current = setTimeout(() => {
+        playEmitTimeoutRef.current = null;
+        if (playerRef.current) onVideoControl("play", playerRef.current.getCurrentTime());
+      }, 150);
+    } else if (event.data === 2 || event.data === 0) {
+      if (playEmitTimeoutRef.current) { clearTimeout(playEmitTimeoutRef.current); playEmitTimeoutRef.current = null; }
+      const pos = playerRef.current?.getCurrentTime() ?? 0;
+      onVideoControl("pause", pos);
+      clearSync();
+    }
   }, [isLeader, onVideoControl, startSync, clearSync]);
+
+  useEffect(() => { onStateChangeRef.current = onStateChange; }, [onStateChange]);
 
   const mountPlayer = useCallback((vid: string) => {
     if (!containerRef.current || !window.YT?.Player) return;
@@ -93,11 +113,13 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
     const div = document.createElement("div");
     div.id = `ytEl-${roundId}`;
     containerRef.current.appendChild(div);
+    // Read videoState from ref so mountPlayer isn't recreated on every sync event
+    const vs = videoStateRef.current;
     let startSec = 0;
-    if (videoState) {
-      startSec = videoState.playing
-        ? videoState.position + (Date.now() - videoState.position_at_ms) / 1000
-        : videoState.position;
+    if (vs) {
+      startSec = vs.playing
+        ? vs.position + (Date.now() - vs.position_at_ms) / 1000
+        : vs.position;
       startSec = Math.max(0, Math.floor(startSec));
     }
     playerRef.current = new window.YT.Player(div, {
@@ -106,11 +128,13 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
       videoId: vid,
       playerVars: { controls: isLeader ? 1 : 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: isLeader ? 0 : 1, fs: 1, iv_load_policy: 3, start: startSec },
       events: {
-        onReady: (e) => { if (videoState?.playing) e.target.playVideo(); },
-        onStateChange,
+        onReady: (e) => { if (vs?.playing) e.target.playVideo(); },
+        // Wrap via ref so the player always calls the latest onStateChange without
+        // needing to recreate the player when onStateChange's deps change.
+        onStateChange: (e) => onStateChangeRef.current(e),
       },
     });
-  }, [roundId, videoState, isLeader, onStateChange]);
+  }, [roundId, isLeader]);
 
   useEffect(() => {
     loadYTScript();
@@ -129,13 +153,31 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
   }, [videoId, mountPlayer]);
 
   // Apply incoming video_control events to non-leader
-  const applyRemoteControl = useCallback((action: string, position: number, serverTs: number) => {
+  const applyRemoteControl = useCallback((action: string, position: number, _serverTs: number) => {
     if (isLeader || !playerRef.current) return;
-    const drift = (Date.now() - serverTs) / 1000;
-    const adj = Math.max(0, position + (action !== "pause" ? drift : 0));
+
+    if (action === "pause") {
+      suppressRef.current = true;
+      playerRef.current.seekTo(position, true);
+      playerRef.current.pauseVideo();
+      setTimeout(() => { suppressRef.current = false; }, 600);
+      return;
+    }
+
+    if (action === "sync") {
+      const current = playerRef.current.getCurrentTime();
+      if (Math.abs(current - position) < 1.5) return;
+      suppressRef.current = true;
+      playerRef.current.seekTo(position, true);
+      playerRef.current.playVideo();
+      setTimeout(() => { suppressRef.current = false; }, 600);
+      return;
+    }
+
+    // play event: small buffer for YouTube seek startup latency
     suppressRef.current = true;
-    playerRef.current.seekTo(adj, true);
-    if (action !== "pause") playerRef.current.playVideo(); else playerRef.current.pauseVideo();
+    playerRef.current.seekTo(Math.max(0, position + 0.3), true);
+    playerRef.current.playVideo();
     setTimeout(() => { suppressRef.current = false; }, 600);
   }, [isLeader]);
 
