@@ -1,2 +1,0 @@
-# ShowMob
-SHOWMOB
