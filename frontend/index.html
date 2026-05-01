@@ -527,6 +527,10 @@ async function api(path, method = 'GET', body = null) {
 function connectSocket() {
   if (state.socket) return;
   state.socket = io(window.location.origin, { transports: ['websocket', 'polling'] });
+  // Re-join the socket room after every reconnection (AWS drops idle connections)
+  state.socket.on('connect', () => {
+    if (state.room) joinSocketRoom(state.room.code);
+  });
   state.socket.on('state_update', ({ rounds, totals }) => {
     state.rounds = rounds;
     state.totals = totals;
@@ -553,8 +557,9 @@ function connectSocket() {
     state.timer = { session_id, duration, round_id, end_at_ms };
     if (state.screen === 'game') {
       const r = state.rounds.find(x => x.id === round_id);
+      const roundChanged = r && state.currentRound && r.id !== state.currentRound.id;
       if (r) state.currentRound = r;
-      render();
+      if (roundChanged) { render(); } else { refreshTimerArea(state.currentRound); }
       startTimerCountdown();
     }
   });
@@ -570,7 +575,7 @@ function connectSocket() {
     state.typingUsers = {};
     state._isTyping = false;
     clearTimeout(state._typingStopTimer);
-    if (state.screen === 'game') render();
+    if (state.screen === 'game') refreshTimerArea(state.currentRound);
   });
 
   state.socket.on('video_set', ({ round_id, video_id }) => {
@@ -1392,26 +1397,12 @@ function renderRoundScores(cr) {
     </div>`).join('');
 }
 
-function renderPlacar() {
-  const cr = state.currentRound;
-  const roundSelector = state.rounds.length > 0 ? `
-    <select class="round-select" onchange="switchRound(+this.value)">
-      ${state.rounds.map(r => `<option value="${r.id}" ${cr&&cr.id===r.id?'selected':''}>RODADA ${r.number}</option>`).join('')}
-    </select>` : '';
-
-  if (!cr) return `
-    <div class="current-round-header">
-      <div>${roundSelector}</div>
-      <button class="btn-new-round" onclick="newRound()">+ NOVA RODADA</button>
-    </div>
-    <div class="no-round"><div class="no-round-icon">🎮</div><div class="no-round-text">Nenhuma rodada ativa</div><div>Crie uma nova rodada para começar!</div></div>
-    <div class="totals-section"><div class="totals-title">PONTUAÇÃO TOTAL</div>${renderTotals()}</div>`;
-
+function renderScoreCards(cr) {
   const scores = cr.scores || {};
   const leader = isLeader();
   const timerActiveForRound = !!(state.timer && state.timer.round_id === cr.id);
   const roundAnswerMap = state.roundAnswers[cr.id] || null;
-  const cards = Object.entries(scores).map(([uid, s]) => {
+  return Object.entries(scores).map(([uid, s]) => {
     const hasScore = s.points > 0;
     const isTyping = timerActiveForRound && !!state.typingUsers[String(uid)];
     const answerText = roundAnswerMap ? (roundAnswerMap[String(uid)] ?? null) : null;
@@ -1432,6 +1423,28 @@ function renderPlacar() {
       ${leader?`<div class="score-card-hint">toque = +1</div>`:''}
     </div>`;
   }).join('');
+}
+
+function renderPlacar() {
+  const cr = state.currentRound;
+  const roundSelector = state.rounds.length > 0 ? `
+    <select class="round-select" onchange="switchRound(+this.value)">
+      ${state.rounds.map(r => `<option value="${r.id}" ${cr&&cr.id===r.id?'selected':''}>RODADA ${r.number}</option>`).join('')}
+    </select>` : '';
+
+  if (!cr) return `
+    <div class="current-round-header">
+      <div>${roundSelector}</div>
+      <button class="btn-new-round" onclick="newRound()">+ NOVA RODADA</button>
+    </div>
+    <div class="no-round"><div class="no-round-icon">🎮</div><div class="no-round-text">Nenhuma rodada ativa</div><div>Crie uma nova rodada para começar!</div></div>
+    <div class="totals-section"><div class="totals-title">PONTUAÇÃO TOTAL</div>${renderTotals()}</div>`;
+
+  const scores = cr.scores || {};
+  const leader = isLeader();
+  const timerActiveForRound = !!(state.timer && state.timer.round_id === cr.id);
+  const roundAnswerMap = state.roundAnswers[cr.id] || null;
+  const cards = renderScoreCards(cr);
 
   return `
     <div class="current-round-header">
@@ -1443,8 +1456,8 @@ function renderPlacar() {
       <input class="round-title-input" type="text" maxlength="60" placeholder="Ex: Rodada das perguntas difíceis..." value="${cr.title||''}" oninput="updateRoundTitle(${cr.id},this.value)">
     </div>
     ${renderVideoSection(cr)}
-    ${renderTimerSection(cr)}
-    <div class="score-grid">${cards}</div>
+    <div id="timerSectionWrap">${renderTimerSection(cr)}</div>
+    <div id="scoreGrid" class="score-grid">${cards}</div>
     <button class="btn-finalizar" onclick="finalizarRodada()">🏆 FINALIZAR RODADA</button>
     <div class="totals-section"><div class="totals-title">PONTUAÇÃO DA RODADA ${cr.number}</div>${renderRoundScores(cr)}</div>`;
 }
@@ -1511,6 +1524,14 @@ function renderGame() {
     </div>
     <div class="content">${content}</div>
   </div>`;
+}
+
+// ── Targeted timer/card update (avoids touching the video player) ──
+function refreshTimerArea(cr) {
+  const timerWrap = document.getElementById('timerSectionWrap');
+  if (timerWrap) timerWrap.innerHTML = renderTimerSection(cr);
+  const grid = document.getElementById('scoreGrid');
+  if (grid) grid.innerHTML = renderScoreCards(cr);
 }
 
 // ── Main Render ──
