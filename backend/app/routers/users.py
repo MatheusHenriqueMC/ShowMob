@@ -10,7 +10,7 @@ from app.schemas.users import CreateUserRequest, ResetPasswordRequest
 router = APIRouter()
 
 
-@router.get("/")
+@router.get("")
 def list_users(user=Depends(get_admin_user)):
     db = get_db()
     result = [
@@ -20,7 +20,7 @@ def list_users(user=Depends(get_admin_user)):
     return result
 
 
-@router.post("/", status_code=201)
+@router.post("", status_code=201)
 def create_user(body: CreateUserRequest, user=Depends(get_admin_user)):
     db = get_db()
     username = body.username.strip()

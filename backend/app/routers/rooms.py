@@ -8,7 +8,7 @@ from app.schemas.rooms import CreateRoomRequest, JoinRoomRequest
 router = APIRouter()
 
 
-@router.post("/", status_code=201)
+@router.post("", status_code=201)
 def create_room(body: CreateRoomRequest, user=Depends(get_auth_user)):
     db = get_db()
     name = (body.name or "").strip() or "Sala sem nome"
