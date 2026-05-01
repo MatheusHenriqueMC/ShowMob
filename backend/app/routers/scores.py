@@ -1,10 +1,19 @@
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.core.database import get_db
+from app.core.database import get_db, get_totals_data
 from app.core.dependencies import get_auth_user
 from app.core.helpers import push_state
 
 router = APIRouter()
+
+
+@router.get("/{code}/totals")
+def get_totals(code: str, user=Depends(get_auth_user)):
+    db = get_db()
+    room = db.rooms.find_one({"code": code.upper()})
+    if not room:
+        raise HTTPException(status_code=404, detail="Sala não encontrada")
+    return get_totals_data(room["_id"])
 
 
 @router.post("/{code}/scores/{rid}/{uid}/increment")
