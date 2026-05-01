@@ -106,7 +106,8 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
 
   const mountPlayer = useCallback((vid: string) => {
     if (!containerRef.current || !window.YT?.Player) return;
-    if (vid === currentVideoIdRef.current && containerRef.current.childElementCount > 0) return;
+    if (vid === currentVideoIdRef.current && containerRef.current.childElementCount > 0) { console.log("[VS] mountPlayer guard passed, skipping"); return; }
+    console.log("[VS] mountPlayer CREATING player", { vid, prevVid: currentVideoIdRef.current, childCount: containerRef.current?.childElementCount, vs: videoStateRef.current });
     if (playerRef.current) { try { playerRef.current.destroy(); } catch { /* ignore */ } playerRef.current = null; }
     currentVideoIdRef.current = vid;
     containerRef.current.innerHTML = "";
@@ -154,8 +155,9 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
 
   // Apply incoming video_control events to non-leader
   const applyRemoteControl = useCallback((action: string, position: number, serverTs: number) => {
-    if (isLeader || !playerRef.current) return;
+    if (isLeader || !playerRef.current) { console.log("[VS] applyRemoteControl skipped", { isLeader, hasPlayer: !!playerRef.current }); return; }
     const drift = (Date.now() - serverTs) / 1000;
+    console.log("[VS] applyRemoteControl", { action, position, drift, current: playerRef.current.getCurrentTime() });
 
     if (action === "pause") {
       suppressRef.current = true;
@@ -169,6 +171,7 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
       // Only correct if the follower has drifted more than 1.5s to avoid jarring micro-seeks
       const current = playerRef.current.getCurrentTime();
       const adj = Math.max(0, position + drift);
+      console.log("[VS] sync check", { current, adj, diff: Math.abs(current - adj) });
       if (Math.abs(current - adj) < 1.5) return;
       suppressRef.current = true;
       playerRef.current.seekTo(adj, true);
