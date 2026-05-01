@@ -23,6 +23,8 @@ def create_round(code: str, user=Depends(get_auth_user)):
     room = db.rooms.find_one({"code": code.upper()})
     if not room:
         raise HTTPException(status_code=404, detail="Sala não encontrada")
+    if user["id"] != room["host_id"]:
+        raise HTTPException(status_code=403, detail="Apenas o líder pode criar rodadas")
     room_id = room["_id"]
     last_round = db.rounds.find_one({"room_id": room_id}, sort=[("number", -1)])
     last_number = last_round["number"] if last_round else 0

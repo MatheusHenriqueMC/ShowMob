@@ -308,7 +308,7 @@ export default function RoomPage() {
       <>
         <div className="current-round-header">
           <div>{roundSelector}</div>
-          <button className="btn-new-round" onClick={newRound}>+ NOVA RODADA</button>
+          {leader && <button className="btn-new-round" onClick={newRound}>+ NOVA RODADA</button>}
         </div>
         <div className="no-round">
           <div style={{ fontSize: 48, marginBottom: 12 }}>🎮</div>
@@ -328,7 +328,7 @@ export default function RoomPage() {
       <>
         <div className="current-round-header">
           <div>{roundSelector}</div>
-          <button className="btn-new-round" onClick={newRound}>+ NOVA RODADA</button>
+          {leader && <button className="btn-new-round" onClick={newRound}>+ NOVA RODADA</button>}
         </div>
 
         <div className="round-title-row">
@@ -355,7 +355,7 @@ export default function RoomPage() {
         />
 
         {timerActiveForRound && timer ? (
-          <TimerWidget timer={timer} myAnswer={myAnswer} onAnswerChange={handleAnswerInput} />
+          <TimerWidget timer={timer} myAnswer={myAnswer} onAnswerChange={handleAnswerInput} onSubmit={saveAnswer} />
         ) : leader ? (
           <div className="timer-config timer-section">
             <span className="field-label" style={{ margin: 0, whiteSpace: "nowrap", fontSize: 10 }}>TIMER</span>
@@ -472,13 +472,13 @@ export default function RoomPage() {
                     );
                   })}
                 </div>
-                <button className="btn-delete-round" onClick={() => deleteRound(r.id)}>✕</button>
+                {leader && <button className="btn-delete-round" onClick={() => deleteRound(r.id)}>✕</button>}
               </div>
             );
           })}
         </div>
 
-        <button className="btn-clear" onClick={clearAll}>🗑️ LIMPAR TUDO</button>
+        {leader && <button className="btn-clear" onClick={clearAll}>🗑️ LIMPAR TUDO</button>}
       </>
     );
   }

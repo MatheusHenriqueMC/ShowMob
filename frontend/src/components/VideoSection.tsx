@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import type { VideoStateEntry } from "@/lib/types";
 
 declare global {
@@ -26,6 +26,7 @@ interface YTPlayer {
   pauseVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
+  setVolume(volume: number): void;
   destroy(): void;
 }
 
@@ -58,6 +59,7 @@ function extractYouTubeId(url: string): string | null {
 export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoControl, onSetVideo, onRemoveVideo }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
+  const [volume, setVolume] = useState(80);
   const currentVideoIdRef = useRef<string | null>(null);
   const suppressRef = useRef(false);
   const syncIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -106,7 +108,7 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
       videoId: vid,
       playerVars: { controls: isLeader ? 1 : 0, playsinline: 1, rel: 0, modestbranding: 1, disablekb: isLeader ? 0 : 1, fs: 1, iv_load_policy: 3, start: startSec },
       events: {
-        onReady: (e) => { if (videoState?.playing) e.target.playVideo(); },
+        onReady: (e) => { e.target.setVolume(volume); if (videoState?.playing) e.target.playVideo(); },
         onStateChange,
       },
     });
@@ -186,10 +188,28 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
         </div>
       )}
       {videoId && (
-        <div className="video-wrapper">
-          <div ref={containerRef} />
-          {!isLeader && <div className="video-overlay" />}
-        </div>
+        <>
+          <div className="video-wrapper">
+            <div ref={containerRef} />
+            {!isLeader && <div className="video-overlay" />}
+          </div>
+          <div className="video-volume-row">
+            <span className="volume-icon">{volume === 0 ? "🔇" : volume < 50 ? "🔉" : "🔊"}</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              className="volume-slider"
+              onChange={(e) => {
+                const v = +e.target.value;
+                setVolume(v);
+                playerRef.current?.setVolume(v);
+              }}
+            />
+            <span className="volume-label">{volume}%</span>
+          </div>
+        </>
       )}
     </div>
   );
