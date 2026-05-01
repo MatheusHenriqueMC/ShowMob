@@ -626,21 +626,29 @@ def handle_video_control(data):
 @socketio.on('finish_round')
 def handle_finish_round(data):
     code = (data.get('code') or '').upper()
-    user_id = data.get('user_id')
+    try:
+        user_id = int(data.get('user_id', 0))
+        round_id = int(data.get('round_id', 0))
+    except (TypeError, ValueError):
+        return
     room = db.rooms.find_one({'code': code})
     if not room or room['host_id'] != user_id:
         return
-    socketio.emit('round_finished', {'round_id': data.get('round_id')}, room=code)
+    socketio.emit('round_finished', {'round_id': round_id}, room=code)
 
 
 @socketio.on('navigate_to_round')
 def handle_navigate_to_round(data):
     code = (data.get('code') or '').upper()
-    user_id = data.get('user_id')
+    try:
+        user_id = int(data.get('user_id', 0))
+        round_id = int(data.get('round_id', 0))
+    except (TypeError, ValueError):
+        return
     room = db.rooms.find_one({'code': code})
     if not room or room['host_id'] != user_id:
         return
-    socketio.emit('navigate_to_round', {'round_id': data.get('round_id')}, room=code)
+    socketio.emit('navigate_to_round', {'round_id': round_id}, room=code)
 
 
 @socketio.on('typing_indicator')

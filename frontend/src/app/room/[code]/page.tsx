@@ -347,7 +347,6 @@ export default function RoomPage() {
       <>
         <div className="current-round-header">
           <div>{roundSelector}</div>
-          <button className="btn-new-round" onClick={() => newRound()}>+ NOVA RODADA</button>
         </div>
 
         <div className="round-title-row">
