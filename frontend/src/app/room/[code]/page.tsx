@@ -278,7 +278,9 @@ export default function RoomPage() {
   }
 
   async function startTimer(roundId: number) {
-    const res = await api<{ error?: string }>(`/rooms/${code}/timer/start`, "POST", { round_id: roundId, duration: timerDuration });
+    const duration = Math.max(5, Math.min(60, timerDuration || 30));
+    setTimerDuration(duration);
+    const res = await api<{ error?: string }>(`/rooms/${code}/timer/start`, "POST", { round_id: roundId, duration });
     if (res.error) alert(res.error);
   }
 
@@ -410,7 +412,8 @@ export default function RoomPage() {
               min={5}
               max={60}
               value={timerDuration}
-              onChange={(e) => setTimerDuration(Math.max(5, Math.min(60, +e.target.value || 30)))}
+              onChange={(e) => setTimerDuration(+e.target.value || 0)}
+              onBlur={(e) => setTimerDuration(Math.max(5, Math.min(60, +e.target.value || 30)))}
             />
             <span style={{ color: "var(--text2)", fontSize: 12 }}>seg</span>
             <span style={{ flex: 1 }} />
