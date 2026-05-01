@@ -106,8 +106,7 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
 
   const mountPlayer = useCallback((vid: string) => {
     if (!containerRef.current || !window.YT?.Player) return;
-    if (vid === currentVideoIdRef.current && containerRef.current.childElementCount > 0) { console.log("[VS] mountPlayer guard passed, skipping"); return; }
-    console.log("[VS] mountPlayer CREATING player", { vid, prevVid: currentVideoIdRef.current, childCount: containerRef.current?.childElementCount, vs: videoStateRef.current });
+    if (vid === currentVideoIdRef.current && containerRef.current.childElementCount > 0) return;
     if (playerRef.current) { try { playerRef.current.destroy(); } catch { /* ignore */ } playerRef.current = null; }
     currentVideoIdRef.current = vid;
     containerRef.current.innerHTML = "";
@@ -154,10 +153,8 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
   }, [videoId, mountPlayer]);
 
   // Apply incoming video_control events to non-leader
-  const applyRemoteControl = useCallback((action: string, position: number, serverTs: number) => {
-    if (isLeader || !playerRef.current) { console.log("[VS] applyRemoteControl skipped", { isLeader, hasPlayer: !!playerRef.current }); return; }
-    const drift = (Date.now() - serverTs) / 1000;
-    console.log("[VS] applyRemoteControl", { action, position, drift, current: playerRef.current.getCurrentTime() });
+  const applyRemoteControl = useCallback((action: string, position: number, _serverTs: number) => {
+    if (isLeader || !playerRef.current) return;
 
     if (action === "pause") {
       suppressRef.current = true;
@@ -168,22 +165,18 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
     }
 
     if (action === "sync") {
-      // Only correct if the follower has drifted more than 1.5s to avoid jarring micro-seeks
       const current = playerRef.current.getCurrentTime();
-      const adj = Math.max(0, position + drift);
-      console.log("[VS] sync check", { current, adj, diff: Math.abs(current - adj) });
-      if (Math.abs(current - adj) < 1.5) return;
+      if (Math.abs(current - position) < 1.5) return;
       suppressRef.current = true;
-      playerRef.current.seekTo(adj, true);
+      playerRef.current.seekTo(position, true);
       playerRef.current.playVideo();
       setTimeout(() => { suppressRef.current = false; }, 600);
       return;
     }
 
-    // play event: add 0.5s to compensate for YouTube's seek+buffer startup latency
-    const adj = Math.max(0, position + drift + 0.5);
+    // play event: small buffer for YouTube seek startup latency
     suppressRef.current = true;
-    playerRef.current.seekTo(adj, true);
+    playerRef.current.seekTo(Math.max(0, position + 0.3), true);
     playerRef.current.playVideo();
     setTimeout(() => { suppressRef.current = false; }, 600);
   }, [isLeader]);
