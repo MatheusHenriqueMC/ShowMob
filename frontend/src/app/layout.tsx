@@ -28,8 +28,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="dns-prefetch" href="https://www.youtube.com" />
         <link rel="dns-prefetch" href="https://i.ytimg.com" />
         <link rel="dns-prefetch" href="https://googlevideo.com" />
-        {/* Load YouTube IFrame API early so it's ready when entering a room */}
-        <script src="https://www.youtube.com/iframe_api" async />
       </head>
       <body className={`${orbitron.variable} ${rajdhani.variable}`}>
         <AuthProvider>{children}</AuthProvider>
