@@ -14,6 +14,20 @@ async def handle_join(sid: str, data: dict) -> None:
         rounds = get_rounds_data(room["_id"])
         totals = get_totals_data(room["_id"])
         await sio.emit("state_update", {"rounds": rounds, "totals": totals}, to=sid)
+        # Send immediate video sync for any active video so the joining player
+        # doesn't wait up to 2 seconds for the next periodic sync
+        for r in rounds:
+            vs = r.get("video_state")
+            if vs and r.get("video_id") and vs.get("playing"):
+                server_ts = int(time.time() * 1000)
+                elapsed = (server_ts - vs["position_at_ms"]) / 1000
+                current_pos = vs["position"] + elapsed
+                await sio.emit("video_control", {
+                    "round_id": r["id"],
+                    "action": "sync",
+                    "position": current_pos,
+                    "server_ts": server_ts,
+                }, to=sid)
 
 
 @sio.on("leave_room")
