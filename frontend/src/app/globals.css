@@ -36,6 +36,70 @@ body {
   padding-bottom: 40px;
 }
 
+/* ── Responsive ─────────────────────────────────────────────────────────── */
+
+@media (min-width: 768px) {
+  .app { max-width: 900px; }
+  .game-header { padding: 16px 32px 12px; }
+  .content { padding: 20px 32px; }
+  .score-grid {
+    grid-template-columns: repeat(auto-fill, minmax(155px, 1fr));
+    gap: 14px;
+  }
+  .lobby-screen { max-width: 900px; margin: 0 auto; }
+}
+
+@media (min-width: 1100px) {
+  .app { max-width: 1280px; }
+  .game-header { padding: 16px 48px 12px; }
+
+  .content {
+    padding: 24px 48px;
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    column-gap: 28px;
+    align-items: start;
+  }
+
+  /* Full-width items */
+  .current-round-header,
+  .round-title-row,
+  .no-round,
+  .empty,
+  .history-summary,
+  .rounds-list,
+  .btn-clear {
+    grid-column: 1 / -1;
+  }
+
+  /* Left column */
+  .video-section,
+  .timer-section,
+  .score-grid,
+  .btn-finalizar { grid-column: 1; }
+
+  /* Right column — totals sticks alongside the main content */
+  .totals-section {
+    grid-column: 2;
+    grid-row: 3 / span 10;
+    margin-top: 0;
+    position: sticky;
+    top: 80px;
+  }
+
+  .score-grid {
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 18px;
+  }
+
+  .score-card-avatar { width: 70px; height: 70px; font-size: 20px; }
+  .score-card-points { font-size: 44px; }
+
+  .lobby-screen { max-width: 1200px; margin: 0 auto; padding: 40px 80px; }
+  .modal-box { max-width: 460px; }
+  .popup-box { max-width: 520px; }
+}
+
 .logo {
   font-family: var(--font-orbitron), monospace;
   font-size: 28px;
