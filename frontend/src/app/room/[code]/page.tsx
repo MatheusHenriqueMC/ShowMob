@@ -331,7 +331,7 @@ export default function RoomPage() {
     return entries.map((s, i) => (
       <div className="total-row" key={i}>
         <div className="total-info">
-          <AvatarSmall color={s.color} avatar={s.avatar} name={s.name} size={28} cls="total-avatar" />
+          <AvatarSmall color={s.color} avatar={s.avatar ?? null} name={s.name} size={28} cls="total-avatar" />
           <span className="total-name">{s.name}</span>
           <span className="total-value" style={{ color: s.color }}>{s.points}</span>
         </div>
