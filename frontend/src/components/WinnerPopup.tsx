@@ -1,17 +1,18 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Round } from "@/lib/types";
+import type { Round, Total } from "@/lib/types";
 
 interface Props {
   round: Round;
+  totals: Total[];
   onClose: () => void;
   onNewRound?: () => Promise<void>;
   onKeepRound?: () => void;
 }
 
 
-export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) {
+export function WinnerPopup({ round, totals, onClose, onNewRound, onKeepRound }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<number | null>(null);
 
@@ -81,7 +82,7 @@ export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) 
             <div className="winner-label">VENCEDOR DA RODADA</div>
             {winner && (
               <div className="winner-avatar-large" style={{ borderColor: winner.color, background: winner.color + "22", boxShadow: `0 0 30px ${winner.color}60`, color: winner.color }}>
-                {winner.avatar ? <img src={winner.avatar} alt={winner.name} style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : (winner.name||"?").substring(0,2).toUpperCase()}
+                {(() => { const av = winner.avatar ?? totals.find(t => t.id === +winner.uid)?.avatar ?? null; return av ? <img src={av} alt={winner.name} style={{ width:"100%",height:"100%",objectFit:"cover" }} /> : (winner.name||"?").substring(0,2).toUpperCase(); })()}
               </div>
             )}
             <div className="winner-name" style={{ color: winner?.color }}>{winner?.name}</div>
@@ -103,7 +104,7 @@ export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) 
                   {i < 3 ? posLabels[i] : `${i+1}º`}
                 </div>
                 <div className="rank-avatar" style={{ borderColor: p.color, background: p.color + "22", color: p.color }}>
-                  {p.avatar ? <img src={p.avatar} alt={p.name} /> : (p.name||"?").substring(0,2).toUpperCase()}
+                  {(() => { const av = p.avatar ?? totals.find(t => t.id === +p.uid)?.avatar ?? null; return av ? <img src={av} alt={p.name} /> : (p.name||"?").substring(0,2).toUpperCase(); })()}
                 </div>
                 <div className="rank-info">
                   <div className="rank-name" style={{ color: p.color }}>{p.name}</div>

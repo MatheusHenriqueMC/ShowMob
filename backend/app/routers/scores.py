@@ -2,7 +2,6 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.core.database import get_db, get_totals_data
 from app.core.dependencies import get_auth_user
-from app.core.helpers import push_state
 
 router = APIRouter()
 
@@ -26,9 +25,7 @@ def increment_score(code: str, rid: int, uid: int, user=Depends(get_auth_user)):
         raise HTTPException(status_code=403, detail="Apenas o líder pode pontuar")
     db.scores.update_one({"round_id": rid, "user_id": uid}, {"$inc": {"points": 1}})
     score = db.scores.find_one({"round_id": rid, "user_id": uid})
-    pts = score["points"] if score else 0
-    push_state(code, room["_id"])
-    return {"points": pts}
+    return {"points": score["points"] if score else 0}
 
 
 @router.post("/{code}/scores/{rid}/{uid}/decrement")
@@ -44,6 +41,4 @@ def decrement_score(code: str, rid: int, uid: int, user=Depends(get_auth_user)):
         {"$inc": {"points": -1}},
     )
     score = db.scores.find_one({"round_id": rid, "user_id": uid})
-    pts = score["points"] if score else 0
-    push_state(code, room["_id"])
-    return {"points": pts}
+    return {"points": score["points"] if score else 0}

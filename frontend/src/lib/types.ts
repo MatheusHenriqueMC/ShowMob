@@ -25,7 +25,7 @@ export interface Room {
 export interface ScoreEntry {
   points: number;
   name: string;
-  avatar: string | null;
+  avatar?: string | null;
   color: string;
 }
 

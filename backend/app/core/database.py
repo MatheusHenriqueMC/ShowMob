@@ -92,7 +92,6 @@ def get_rounds_data(room_id: int) -> list[dict]:
         scores_by_round.setdefault(s["round_id"], {})[str(s["user_id"])] = {
             "points": s["points"],
             "name": u.get("display_name") or u.get("username", ""),
-            "avatar": u.get("avatar"),
             "color": u.get("color"),
         }
     return [
@@ -144,6 +143,8 @@ def init_db() -> None:
     db.room_members.create_index(
         [("room_id", ASCENDING), ("user_id", ASCENDING)], unique=True
     )
+    db.room_members.create_index([("room_id", ASCENDING)])
+    db.rounds.create_index([("room_id", ASCENDING)])
     db.scores.create_index(
         [("round_id", ASCENDING), ("user_id", ASCENDING)], unique=True
     )

@@ -426,6 +426,7 @@ export default function RoomPage() {
             const hasScore = s.points > 0;
             const isTyping = timerActiveForRound && !!typingUsers[uid];
             const answerText = roundAnswerMap ? (roundAnswerMap[uid] ?? null) : null;
+            const avatar = s.avatar ?? totals.find((t) => t.id === +uid)?.avatar ?? null;
             return (
               <div
                 key={uid}
@@ -450,7 +451,7 @@ export default function RoomPage() {
                   <div className="card-indicator card-typing" style={{ display: isTyping ? "flex" : "none" }}>✏️ digitando...</div>
                 ) : null}
                 <div className="score-card-avatar" style={{ borderColor: s.color, background: s.color + "22", color: s.color }}>
-                  {s.avatar ? <img src={s.avatar} alt={s.name} /> : (s.name || "?").substring(0, 2).toUpperCase()}
+                  {avatar ? <img src={avatar} alt={s.name} /> : (s.name || "?").substring(0, 2).toUpperCase()}
                 </div>
                 <div className="score-card-name" style={{ color: s.color }}>{s.name}</div>
                 <div className="score-card-points" style={{ color: hasScore ? "#fff" : "rgba(255,255,255,0.2)" }}>{s.points}</div>
@@ -581,6 +582,7 @@ export default function RoomPage() {
       {winnerRound && (
         <WinnerPopup
           round={winnerRound}
+          totals={totals}
           onClose={() => setWinnerRound(null)}
           onNewRound={!!isLeader() ? async () => { await newRound(true); } : undefined}
           onKeepRound={!!isLeader() ? () => getSocket().emit("keep_round", { code, user_id: user?.id }) : undefined}
