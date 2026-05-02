@@ -140,6 +140,20 @@ async def handle_keep_round(sid: str, data: dict) -> None:
     await sio.emit("keep_round", {}, room=code)
 
 
+@sio.on("answer_submitted")
+async def handle_answer_submitted(sid: str, data: dict) -> None:
+    code = (data.get("code") or "").upper()
+    user_id = data.get("user_id")
+    session_id = data.get("session_id")
+    if not user_id or not session_id:
+        return
+    db = get_db()
+    session = db.timer_sessions.find_one({"_id": session_id, "ended": False})
+    if not session:
+        return
+    await sio.emit("user_submitted", {"user_id": user_id}, room=code)
+
+
 @sio.on("typing_indicator")
 async def handle_typing(sid: str, data: dict) -> None:
     code = (data.get("code") or "").upper()

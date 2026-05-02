@@ -6,10 +6,12 @@ import type { TimerState } from "@/lib/types";
 interface Props {
   timer: TimerState;
   myAnswer: string;
+  saveStatus: "idle" | "saving" | "saved";
   onAnswerChange: (v: string) => void;
+  onSubmit: () => void;
 }
 
-export function TimerWidget({ timer, myAnswer, onAnswerChange }: Props) {
+export function TimerWidget({ timer, myAnswer, saveStatus, onAnswerChange, onSubmit }: Props) {
   const [display, setDisplay] = useState({ remaining: 0, pct: 100 });
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -32,17 +34,32 @@ export function TimerWidget({ timer, myAnswer, onAnswerChange }: Props) {
       <div className="timer-bar-track">
         <div className="timer-bar-fill" style={{ width: `${display.pct}%` }} />
       </div>
-      <input
-        id="timerAnswerInput"
-        className="text-input timer-answer-input"
-        type="text"
-        maxLength={200}
-        placeholder="Sua resposta..."
-        value={myAnswer}
-        onChange={(e) => onAnswerChange(e.target.value)}
-        autoComplete="off"
-        spellCheck={false}
-      />
+      <div style={{ position: "relative" }}>
+        <input
+          id="timerAnswerInput"
+          className="text-input timer-answer-input"
+          type="text"
+          maxLength={200}
+          placeholder="Sua resposta... (Enter para confirmar)"
+          value={myAnswer}
+          onChange={(e) => onAnswerChange(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onSubmit(); } }}
+          autoComplete="off"
+          spellCheck={false}
+          style={{ paddingRight: 40 }}
+        />
+        <span style={{
+          position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+          fontSize: 18, lineHeight: 1,
+          color: saveStatus === "saved" ? "#00cc66" : saveStatus === "saving" ? "#ff8c00" : "rgba(255,255,255,0.2)",
+          transition: "color 0.3s",
+        }}>
+          {saveStatus === "saved" ? "✓" : saveStatus === "saving" ? "…" : "○"}
+        </span>
+      </div>
+      <div style={{ fontSize: 11, color: saveStatus === "saved" ? "#00cc66" : "rgba(255,255,255,0.3)", textAlign: "center", marginTop: 4, letterSpacing: 1 }}>
+        {saveStatus === "saved" ? "RESPOSTA ENVIADA" : saveStatus === "saving" ? "ENVIANDO..." : "PRESSIONE ENTER PARA CONFIRMAR"}
+      </div>
     </div>
   );
 }

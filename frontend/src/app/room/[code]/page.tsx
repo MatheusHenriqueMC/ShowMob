@@ -47,6 +47,8 @@ export default function RoomPage() {
   const [showAdmin, setShowAdmin] = useState(false);
   const [winnerRound, setWinnerRound] = useState<Round | null>(null);
   const [titleSaveTimer, setTitleSaveTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [submittedUsers, setSubmittedUsers] = useState<Record<number, boolean>>({});
 
   const timerRef = useRef<TimerState | null>(null);
   const myAnswerRef = useRef("");
@@ -160,6 +162,8 @@ export default function RoomPage() {
       setMyAnswer("");
       myAnswerRef.current = "";
       setTypingUsers({});
+      setSubmittedUsers({});
+      setSaveStatus("idle");
       typingRef.current = false;
       if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
     });
@@ -200,6 +204,10 @@ export default function RoomPage() {
       if (typeof fn === "function") (fn as (a: string, p: number, t: number) => void)(action, position, server_ts);
     });
 
+    sock.on("user_submitted", ({ user_id }: { user_id: number }) => {
+      setSubmittedUsers((prev) => ({ ...prev, [user_id]: true }));
+    });
+
     sock.on("typing_update", ({ user_id, is_typing, session_id }: { user_id: number; is_typing: boolean; session_id: string }) => {
       if (!timerRef.current || timerRef.current.session_id !== session_id) return;
       setTypingUsers((prev) => ({ ...prev, [String(user_id)]: is_typing }));
@@ -218,6 +226,7 @@ export default function RoomPage() {
   function handleAnswerInput(value: string) {
     setMyAnswer(value);
     myAnswerRef.current = value;
+    setSaveStatus("idle");
     if (!typingRef.current) { typingRef.current = true; emitTyping(true); }
     if (typingStopTimer.current) clearTimeout(typingStopTimer.current);
     typingStopTimer.current = setTimeout(() => { typingRef.current = false; emitTyping(false); }, 2000);
@@ -229,7 +238,20 @@ export default function RoomPage() {
     const t = timerRef.current;
     const r = roomRef.current;
     if (!t || !r) return;
-    await api(`/rooms/${r.code}/timer/answer`, "POST", { session_id: t.session_id, text: myAnswerRef.current });
+    setSaveStatus("saving");
+    const res = await api<{ ok?: boolean; error?: string }>(`/rooms/${r.code}/timer/answer`, "POST", { session_id: t.session_id, text: myAnswerRef.current });
+    if (!res.error) setSaveStatus("saved");
+    else setSaveStatus("idle");
+  }
+
+  async function handleSubmitAnswer() {
+    if (answerSaveTimer.current) { clearTimeout(answerSaveTimer.current); answerSaveTimer.current = null; }
+    await saveAnswer();
+    const t = timerRef.current;
+    const r = roomRef.current;
+    if (!t || !r || !user) return;
+    getSocket().emit("answer_submitted", { code: r.code, session_id: t.session_id, user_id: user.id });
+    if (typingRef.current) { typingRef.current = false; emitTyping(false); }
   }
 
   async function newRound(navigateAll = false) {
@@ -402,7 +424,7 @@ export default function RoomPage() {
         />
 
         {timerActiveForRound && timer ? (
-          <TimerWidget timer={timer} myAnswer={myAnswer} onAnswerChange={handleAnswerInput} />
+          <TimerWidget timer={timer} myAnswer={myAnswer} saveStatus={saveStatus} onAnswerChange={handleAnswerInput} onSubmit={handleSubmitAnswer} />
         ) : leader ? (
           <div className="timer-config timer-section">
             <span className="field-label" style={{ margin: 0, whiteSpace: "nowrap", fontSize: 10 }}>TIMER</span>
@@ -445,10 +467,13 @@ export default function RoomPage() {
                     onClick={(e) => { e.stopPropagation(); decrement(cr.id, uid); }}
                   >−</button>
                 )}
+                {submittedUsers[+uid] && (
+                  <div className="card-submitted">✓</div>
+                )}
                 {answerText !== null ? (
                   <div className="card-indicator card-answer-display">{answerText}</div>
                 ) : timerActiveForRound ? (
-                  <div className="card-indicator card-typing" style={{ display: isTyping ? "flex" : "none" }}>✏️ digitando...</div>
+                  <div className="card-indicator card-typing" style={{ display: isTyping ? "flex" : "none" }}>...</div>
                 ) : null}
                 <div className="score-card-avatar" style={{ borderColor: s.color, background: s.color + "22", color: s.color }}>
                   {avatar ? <img src={avatar} alt={s.name} /> : (s.name || "?").substring(0, 2).toUpperCase()}
