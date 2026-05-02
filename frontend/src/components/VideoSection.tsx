@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import type { VideoStateEntry } from "@/lib/types";
 
 declare global {
@@ -26,6 +26,7 @@ interface YTPlayer {
   pauseVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
   getCurrentTime(): number;
+  setVolume(volume: number): void;
   destroy(): void;
 }
 
@@ -187,6 +188,8 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
     return () => { delete (window as unknown as Record<string, unknown>)[`applyVideoControl_${roundId}`]; };
   }, [roundId, applyRemoteControl]);
 
+  const [volume, setVolume] = useState(100);
+
   if (!videoId && !isLeader) return null;
 
   return (
@@ -228,10 +231,28 @@ export function VideoSection({ roundId, videoId, videoState, isLeader, onVideoCo
         </div>
       )}
       {videoId && (
-        <div className="video-wrapper">
-          <div ref={containerRef} />
-          {!isLeader && <div className="video-overlay" />}
-        </div>
+        <>
+          <div className="video-wrapper">
+            <div ref={containerRef} />
+            {!isLeader && <div className="video-overlay" />}
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 6, padding: "0 2px" }}>
+            <span style={{ fontSize: 14 }}>{volume === 0 ? "🔇" : volume < 50 ? "🔉" : "🔊"}</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={volume}
+              style={{ flex: 1, accentColor: "var(--accent)" }}
+              onChange={(e) => {
+                const v = +e.target.value;
+                setVolume(v);
+                playerRef.current?.setVolume(v);
+              }}
+            />
+            <span style={{ fontSize: 11, color: "var(--text2)", minWidth: 28 }}>{volume}%</span>
+          </div>
+        </>
       )}
     </div>
   );

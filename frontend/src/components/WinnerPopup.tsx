@@ -24,7 +24,7 @@ export function WinnerPopup({ round, onClose, onNewRound, onKeepRound }: Props) 
 
   useEffect(() => {
     const sfx = new Audio("/sounds/fanfare.mp3");
-    sfx.volume = 0.7;
+    sfx.volume = 0.4;
     sfx.play().catch(() => {});
     launchConfetti();
     return () => {
